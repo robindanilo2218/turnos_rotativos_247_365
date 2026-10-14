@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="es">
+<!-- 
+======================================================================
+  LÓGICA DE NEGOCIO, MODELOS DE TURNOS Y AUDITORÍA FINANCIERA
+  Desarrollado y estructurado por:
+  Robin Gregorio octubre 14 2026, contacto: +502 4298 9037
+  
+  Para consultas, mantenimiento, permisos de uso o integraciones, 
+  por favor contactar directamente al autor.
+
+  LICENCIA: GNU General Public License v3.0 (GPL-3.0)
+  Este código es de uso libre. Si realizas cambios, modificaciones 
+  o mejoras a este software y lo implementas o distribuyes, estás 
+  obligado a compartir el código fuente resultante de manera pública 
+  bajo esta misma licencia, garantizando que siempre se mantenga libre.
+======================================================================
+-->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador Maestro 24/7 - Ultimate Dinámico</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Librería para leer XLSX y CSV -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        /* 
+           CSS y estilos de interfaz 
+           Consultas: Robin Gregorio octubre 14 2026, contacto: +502 4298 9037
+           Licencia: GPL-3.0
+        */
+        .bg-manana { background-color: #dbeafe; color: #1e3a8a; } 
+        .bg-tarde { background-color: #fef08a; color: #854d0e; } 
+        .bg-noche { background-color: #e0e7ff; color: #3730a3; } 
+        .bg-descanso { background-color: #f3f4f6; color: #4b5563; } 
+
+        .badge-A { background-color: #ef4444; color: white; } 
+        .badge-B { background-color: #3b82f6; color: white; } 
+        .badge-C { background-color: #10b981; color: white; } 
+        .badge-D { background-color: #f59e0b; color: white; } 
+
+        .opacado { opacity: 0.25; transform: scale(0.9); transition: all 0.3s; }
+        .resaltado { opacity: 1; transform: scale(1.15); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); transition: all 0.3s; font-weight: bold; border: 2px solid #000; }
+        .badge { transition: all 0.3s ease; }
+        
+        .sticky-col { position: sticky; left: 0; background: white; z-index: 10; border-right: 2px solid #e5e7eb; }
+        .modal { display: none; }
+        .modal.active { display: flex; }
+        
+        .toggle-checkbox:checked { right: 0; border-color: #10b981; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #10b981; }
+        .toggle-checkbox { right: 0; z-index: 1; border-color: #e5e7eb; transition: all 0.3s; }
+        .toggle-label { width: 2.5rem; height: 1.25rem; background-color: #e5e7eb; border-radius: 9999px; transition: all 0.3s; cursor: pointer; }
+
+        .trazable { cursor: help; border-bottom: 2px dotted #94a3b8; padding-bottom: 1px; transition: border-color 0.2s; }
+        .trazable:hover, .trazable:active { border-color: #0f172a; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen relative flex flex-col">
+
+    <div class="max-w-[1400px] mx-auto p-4 sm:p-6 flex-grow">
+        
+        <!-- 
+            Panel de Controles 
+            Diseño e interacción: Robin Gregorio octubre 14 2026, contacto: +502 4298 9037 
+        -->
+        <div class="bg-white rounded-xl shadow-lg p-5 mb-8 border border-slate-200">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 border-b pb-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                        Simulador Maestro Dinámico
+                    </h1>
+                    <p class="text-sm text-slate-500 mt-1">Línea de tiempo expandible, feriados integrados, auditoría táctil y carga masiva.</p>
+                </div>
+
+                <div class="flex gap-2 flex-wrap">
+                    <button onclick="abrirModalCarga()" class="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition shadow-sm flex items-center gap-2">
+                        📁 Importar CSV/Excel
+                    </button>
+                    <button onclick="abrirModalContabilidad()" class="bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition shadow-sm flex items-center gap-2">
+                        💰 Carga Financiera
+                    </button>
+                    <button id="btnFullscreen" class="bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg p-2 transition shadow-sm" title="Pantalla Completa">
+                        <svg id="iconExpand" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 items-end">
+                <div class="flex flex-col">
+                    <label class="text-xs font-semibold text-slate-500 mb-1">Modelo de Turno</label>
+                    <select id="selModelo" class="border rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-slate-50 font-bold">
+                        <option value="1">🔵 1-1-1-1 (Diario Continuo)</option>
+                        <option value="4">🔥 3-1-3-1 (3 días turno, 1 libre)</option>
+                        <option value="2">🟢 Santo Grial (2-2-2-2)</option>
+                        <option value="3">🟡 Clásico (6x2)</option>
+                        <option value="0">🔴 Infierno (3 Cuadrillas)</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="text-xs font-semibold text-slate-500 mb-1">Fecha de Inicio</label>
+                    <input type="date" id="fechaInicio" class="border rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+
+                <div class="flex flex-col relative">
+                    <label class="text-xs font-semibold text-slate-500 mb-1">Días a Evaluar</label>
+                    <input type="number" id="inDias" value="28" min="1" max="1000" class="border rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none font-bold text-emerald-700 bg-emerald-50">
+                </div>
+
+                <div class="flex flex-col relative">
+                    <label class="text-xs font-semibold text-slate-500 mb-1">Feriados en Periodo</label>
+                    <input type="number" id="inFeriados" value="0" min="0" class="border rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-amber-500 outline-none font-bold text-amber-700 bg-amber-50" title="Se auto-calcula con la fecha, pero puedes editarlo manualmente.">
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="text-xs font-semibold text-slate-500 mb-1">Rotación</label>
+                    <button id="btnInvertir" class="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg px-2 py-2 text-sm font-medium transition shadow-sm flex justify-center items-center gap-1 w-full">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        <span id="textoRotacion">N ➔ T ➔ M ➔ D</span>
+                    </button>
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="text-xs font-semibold text-slate-500 mb-1">Mi Cuadrilla</label>
+                    <select id="miCuadrilla" class="border rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="ninguna">Ver Todas</option>
+                        <option value="A">Cuadrilla A</option>
+                        <option value="B">Cuadrilla B</option>
+                        <option value="C">Cuadrilla C</option>
+                        <option value="D" id="opt-D">Cuadrilla D</option>
+                    </select>
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="text-xs font-semibold text-slate-500 mb-1">Sueldo Promedio (Q)</label>
+                    <input type="number" id="inSueldo" value="3816.90" class="border rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-right font-bold text-blue-700 bg-blue-50">
+                </div>
+
+                <div class="flex flex-col">
+                    <label class="text-xs font-semibold text-slate-500 mb-1">Personal / Turno</label>
+                    <input type="number" id="inPersonal" value="5" class="border rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-center">
+                </div>
+            </div>
+        </div>
+
+        <!-- 
+            Calendario Dinámico 
+            Motor de renderizado: Robin Gregorio octubre 14 2026, contacto: +502 4298 9037 
+        -->
+        <div class="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-center border-collapse min-w-[800px]" id="tablaTurnos">
+                    <thead class="bg-slate-800 text-white">
+                        <tr id="headDias">
+                            <!-- JS Inject -->
+                        </tr>
+                    </thead>
+                    <tbody id="bodyTurnos">
+                        <!-- JS Inject -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 
+        Modal de Carga Masiva CSV/XLSX 
+        Integración y Parser: Robin Gregorio octubre 14 2026, contacto: +502 4298 9037 
+    -->
+    <div id="modalCarga" class="modal fixed inset-0 bg-slate-900 bg-opacity-70 z-50 items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden">
+            <div class="flex justify-between items-center p-5 border-b border-slate-200 bg-blue-50">
+                <h2 class="text-xl font-bold text-blue-900 flex items-center gap-2">
+                    📁 Importación Masiva de Planilla
+                </h2>
+                <button onclick="cerrarModalCarga()" class="text-blue-400 hover:text-red-500 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="p-6">
+                <div class="bg-amber-50 border-l-4 border-amber-400 p-4 mb-5 rounded shadow-sm text-sm text-amber-900">
+                    <strong class="block mb-1">¿Qué información se requiere explícitamente?</strong>
+                    Sube tu archivo (.csv o .xlsx) y selecciona únicamente la columna que contiene los <strong>Sueldos Base Mensuales</strong>. El sistema ignorará nombres, DPIs o puestos y calculará el promedio ponderado.
+                </div>
+
+                <div class="mb-5">
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">1. Sube tu archivo Excel o CSV</label>
+                    <input type="file" id="fileUpload" accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer border border-slate-200 rounded-full p-1">
+                </div>
+
+                <div id="mappingSection" class="hidden mb-5 border border-slate-200 rounded-lg p-4 bg-slate-50">
+                    <label class="block text-sm font-bold text-slate-700 mb-2">2. Mapeo de Columnas (Selecciona los campos)</label>
+                    <div class="flex flex-col">
+                        <label class="text-xs font-semibold text-slate-600 uppercase mb-1">Columna de Sueldo Base (Obligatorio)</label>
+                        <select id="mapSueldo" class="border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-full bg-white shadow-sm"></select>
+                    </div>
+                    
+                    <button onclick="aplicarCargaMasiva()" class="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg transition shadow">
+                        Procesar y Extraer Promedio
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 
+        Modal de Carga Financiera 
+        Auditoría y Lógica Laboral (Ley GT): Robin Gregorio octubre 14 2026, contacto: +502 4298 9037 
+    -->
+    <div id="modalContabilidad" class="modal fixed inset-0 bg-slate-900 bg-opacity-70 z-50 items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col">
+            
+            <div class="flex justify-between items-center p-5 border-b border-slate-200 bg-slate-50 rounded-t-xl">
+                <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                    <span>⚖️</span> Análisis Financiero Dinámico (<span id="lblModalDias"></span> Días)
+                </h2>
+                <button onclick="cerrarModalContabilidad()" class="text-slate-400 hover:text-red-500 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            
+            <div class="p-4 md:p-6 overflow-y-auto bg-slate-50">
+                <p class="text-xs text-indigo-600 mb-4 text-center font-bold uppercase tracking-widest bg-indigo-100 rounded-full py-1.5 px-4 shadow-sm border border-indigo-200">
+                    👆 Modo Responsivo: Toca las líneas punteadas con el dedo para auditar fórmulas
+                </p>
+                
+                <div class="flex flex-col md:flex-row gap-4 mb-6">
+                    <!-- Tarifas -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center w-full md:w-1/3">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs text-slate-500 font-bold uppercase">Sueldo Base Mensual</span>
+                            <span class="text-lg font-bold text-slate-800 trazable" id="lblSueldoBase">Q0.00</span>
+                        </div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-xs text-blue-600 font-bold uppercase">Hora Ordinaria</span>
+                            <span class="text-lg font-bold text-blue-700 font-mono trazable" id="lblHoraOrd">Q0.00</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-red-500 font-bold uppercase">Hora Extra (150%)</span>
+                            <span class="text-lg font-bold text-red-700 font-mono trazable" id="lblHoraExt">Q0.00</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Configuración de Prestaciones -->
+                    <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-200 shadow-sm w-full md:w-2/3">
+                        <h4 class="text-sm font-bold text-indigo-900 mb-3 border-b border-indigo-200 pb-1">¿Qué prestaciones incluyen el valor de Horas Extras? (Área Gris Legal)</h4>
+                        <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                            <!-- Toggles -->
+                            <div class="flex items-center gap-2">
+                                <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                    <input type="checkbox" id="chkBono" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                                    <label for="chkBono" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+                                </div>
+                                <label class="text-xs font-semibold text-slate-700">Bono 14</label>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                    <input type="checkbox" id="chkAguinaldo" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer"/>
+                                    <label for="chkAguinaldo" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+                                </div>
+                                <label class="text-xs font-semibold text-slate-700">Aguinaldo</label>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                    <input type="checkbox" id="chkVac" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer" checked/>
+                                    <label for="chkVac" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+                                </div>
+                                <label class="text-xs font-semibold text-slate-700">Vacaciones</label>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="relative inline-block w-10 mr-2 align-middle select-none transition duration-200 ease-in">
+                                    <input type="checkbox" id="chkIndem" class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer" checked/>
+                                    <label for="chkIndem" class="toggle-label block overflow-hidden h-5 rounded-full bg-gray-300 cursor-pointer"></label>
+                                </div>
+                                <label class="text-xs font-semibold text-slate-700">Indemnización</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Comparativa 3 vs 4 Cuadrillas -->
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
+                    
+                    <!-- 3 Cuadrillas -->
+                    <div class="bg-white border rounded-xl p-4 md:p-5 shadow-sm relative overflow-hidden border-red-200">
+                        <div class="absolute top-0 right-0 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">Escenario Actual</div>
+                        <h3 class="text-lg font-bold text-slate-800 mb-1 border-b pb-2 flex items-center gap-2">🔴 Sistema de 3 Cuadrillas</h3>
+                        
+                        <div class="space-y-3 mt-4">
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-slate-600 font-semibold">Nómina Base Periodo (<span class="emp-3c-qty"></span> emp.)</span>
+                                <span id="e3-base" class="font-mono text-slate-800 trazable">Q0.00</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-red-600 font-semibold">Horas Extras Carga Fija</span>
+                                <span id="e3-extras" class="font-mono font-bold text-red-600 trazable">Q0.00</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm bg-orange-50 p-1 rounded">
+                                <span class="text-orange-800 font-semibold">Prima por Feriados Trabajados</span>
+                                <span id="e3-feriados" class="font-mono font-bold text-orange-700 trazable">Q0.00</span>
+                            </div>
+                            
+                            <!-- Desglose Prestaciones Dinámicas -->
+                            <div class="pt-3 border-t border-slate-200 space-y-2 text-xs">
+                                <div class="flex justify-between text-slate-500"><span>Bono 14 (8.33%)</span> <span id="e3-p-bono" class="trazable">Q0.00</span></div>
+                                <div class="flex justify-between text-slate-500"><span>Aguinaldo (8.33%)</span> <span id="e3-p-aguin" class="trazable">Q0.00</span></div>
+                                <div class="flex justify-between text-slate-500"><span>Indemnización (8.33%)</span> <span id="e3-p-indem" class="trazable">Q0.00</span></div>
+                                <div class="flex justify-between text-slate-500"><span>Vacaciones (4.16%)</span> <span id="e3-p-vac" class="trazable">Q0.00</span></div>
+                                <div class="flex justify-between text-slate-500"><span>Patronal IGSS (12.67%)</span> <span id="e3-p-igss" class="trazable">Q0.00</span></div>
+                            </div>
+
+                            <div class="flex justify-between items-center text-sm bg-amber-50 p-2 rounded border border-amber-200 mt-2">
+                                <span class="text-amber-800 font-bold">Reserva Pasivo</span>
+                                <span id="e3-pasivo" class="font-mono font-bold text-amber-700 trazable">Q0.00</span>
+                            </div>
+
+                            <div class="flex justify-between items-center text-base md:text-lg pt-2 border-t-2 border-slate-800 font-bold mt-2">
+                                <span>Costo Real Periodo</span>
+                                <span id="e3-total" class="text-red-700 trazable">Q0.00</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4 Cuadrillas -->
+                    <div class="bg-white border rounded-xl p-4 md:p-5 shadow-sm relative overflow-hidden border-emerald-200">
+                        <div class="absolute top-0 right-0 bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">Nuevo Escenario</div>
+                        <h3 class="text-lg font-bold text-slate-800 mb-1 border-b pb-2 flex items-center gap-2">🟢 Sistema de 4 Cuadrillas</h3>
+                        
+                        <div class="space-y-3 mt-4">
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-slate-600 font-semibold">Nómina Base Periodo (<span class="emp-4c-qty"></span> emp.)</span>
+                                <span id="e4-base" class="font-mono text-slate-800 trazable">Q0.00</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <span class="text-amber-600 font-semibold">Extras Nocturnas Fijas</span>
+                                <span id="e4-extras" class="font-mono font-bold text-amber-600 trazable">Q0.00</span>
+                            </div>
+                            <div class="flex justify-between items-center text-sm bg-orange-50 p-1 rounded">
+                                <span class="text-orange-800 font-semibold">Prima por Feriados Trabajados</span>
+                                <span id="e4-feriados" class="font-mono font-bold text-orange-700 trazable">Q0.00</span>
+                            </div>
+                            
+                            <!-- Desglose Prestaciones Dinámicas -->
+                            <div class="pt-3 border-t border-slate-200 space-y-2 text-xs">
+                                <div class="flex justify-between text-slate-500"><span>Bono 14 (8.33%)</span> <span id="e4-p-bono" class="trazable">Q0.00</span></div>
+                                <div class="flex justify-between text-slate-500"><span>Aguinaldo (8.33%)</span> <span id="e4-p-aguin" class="trazable">Q0.00</span></div>
+                                <div class="flex justify-between text-slate-500"><span>Indemnización (8.33%)</span> <span id="e4-p-indem" class="trazable">Q0.00</span></div>
+                                <div class="flex justify-between text-slate-500"><span>Vacaciones (4.16%)</span> <span id="e4-p-vac" class="trazable">Q0.00</span></div>
+                                <div class="flex justify-between text-slate-500"><span>Patronal IGSS (12.67%)</span> <span id="e4-p-igss" class="trazable">Q0.00</span></div>
+                            </div>
+
+                            <div class="flex justify-between items-center text-sm bg-emerald-50 p-2 rounded border border-emerald-200 mt-2">
+                                <span class="text-emerald-800 font-bold">Reserva Pasivo</span>
+                                <span id="e4-pasivo" class="font-mono font-bold text-emerald-700 trazable">Q0.00</span>
+                            </div>
+
+                            <div class="flex justify-between items-center text-base md:text-lg pt-2 border-t-2 border-slate-800 font-bold mt-2">
+                                <span>Costo Real Periodo</span>
+                                <span id="e4-total" class="text-emerald-700 trazable">Q0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Conclusión del Ahorro -->
+                <div class="bg-slate-800 rounded-xl p-5 text-center shadow-lg">
+                    <h4 class="text-slate-400 text-sm font-bold uppercase tracking-wider mb-2">Ahorro Financiero (<span id="lblCajaAhorroDias"></span> Días)</h4>
+                    <p class="text-4xl font-extrabold text-emerald-400 mb-2 trazable inline-block mx-auto cursor-help" id="gran-ahorro">Q0.00</p>
+                    <p class="text-sm text-slate-300 mt-2">Impacto financiero neto tras restar el costo del personal adicional frente al alivio de pasivos laborales inflados por tiempo extraordinario estructural.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Div Especial Flotante para los Tooltips Táctiles/Responsivos -->
+    <div id="customTooltip" class="hidden fixed z-[9999] bg-slate-900 text-white text-xs p-3 rounded-lg shadow-xl max-w-xs transition-opacity duration-200 pointer-events-none border border-slate-700 font-sans tracking-wide leading-relaxed"></div>
+
+    <div class="text-center pb-2 pt-4">
+        <p class="text-[9px] text-slate-400">&copy; mantenido por crgm.systems</p>
+    </div>
+
+    <script>
+        // ======================================================================
+        // CÓDIGO FUENTE JAVASCRIPT
+        // Arquitectura, matemática laboral y optimización algorítmica por:
+        // Robin Gregorio octubre 14 2026, contacto: +502 4298 9037
+        // Licencia: GPL-3.0
+        // ======================================================================
+        
+        const TURNOS = [
+            { id: 'M', nombre: 'Mañana', horas: '06:00 - 14:00', clase: 'bg-manana', ord: 8, ext: 0 },
+            { id: 'T', nombre: 'Tarde', horas: '14:00 - 21:00', clase: 'bg-tarde', ord: 7, ext: 0 },
+            { id: 'N', nombre: 'Noche', horas: '21:00 - 06:00', clase: 'bg-noche', ord: 6, ext: 3 },
+            { id: 'D', nombre: 'Descansa', horas: 'Libre', clase: 'bg-descanso', ord: 0, ext: 0 }
+        ];
+
+        const MODELOS = {
+            "0": { equipos: 3, patronNormal: ['M','T','N'], patronInverso: ['T','M','N'], patronNoche: ['N','T','M'], desfaseBase: 1 },
+            "1": { equipos: 4, patronNormal: ['M','T','N','D'], patronInverso: ['T','M','N','D'], patronNoche: ['N','T','M','D'], desfaseBase: 3 },
+            "2": { equipos: 4, patronNormal: ['M','M','T','T','N','N','D','D'], patronInverso: ['T','T','M','M','N','N','D','D'], patronNoche: ['N','N','T','T','M','M','D','D'], desfaseBase: 6 },
+            "3": { equipos: 4, patronNormal: ['M','M','M','M','M','M','D','D','T','T','T','T','T','T','D','D','N','N','N','N','N','N','D','D'], patronInverso: ['T','T','T','T','T','T','D','D','M','M','M','M','M','M','D','D','N','N','N','N','N','N','D','D'], patronNoche: ['N','N','N','N','N','N','D','D','T','T','T','T','T','T','D','D','M','M','M','M','M','M','D','D'], desfaseBase: 18 },
+            "4": { equipos: 4, patronNormal: ['M','M','M','D', 'T','T','T','D', 'N','N','N','D'], patronInverso: ['T','T','T','D', 'M','M','M','D', 'N','N','N','D'], patronNoche: ['N','N','N','D', 'T','T','T','D', 'M','M','M','D'], desfaseBase: 9 }
+        };
+
+        // Feriados fijos comunes en GT (Mes-Día)
+        const FERIADOS_FIJOS = ['01-01', '05-01', '06-30', '08-15', '09-15', '10-20', '11-01', '12-24', '12-25', '12-31'];
+
+        let estado = {
+            fechaInicio: new Date().toISOString().split('T')[0],
+            diasEvaluar: 28,
+            feriadosManual: null,
+            cuadrillaSel: 'ninguna',
+            tipoRotacion: 2,  
+            sueldo: 3816.90,
+            personalPorTurno: 5,
+            modeloId: "1",    
+            cfgBono: false,
+            cfgAguinaldo: false,
+            cfgVacaciones: true,
+            cfgIndemnizacion: true
+        };
+
+        const inputs = {
+            fecha: document.getElementById('fechaInicio'),
+            dias: document.getElementById('inDias'),
+            feriados: document.getElementById('inFeriados'),
+            cuadrilla: document.getElementById('miCuadrilla'),
+            sueldo: document.getElementById('inSueldo'),
+            personal: document.getElementById('inPersonal'),
+            modelo: document.getElementById('selModelo'),
+            btnInvertir: document.getElementById('btnInvertir'),
+            txtRotacion: document.getElementById('textoRotacion')
+        };
+        const modal = document.getElementById('modalContabilidad');
+        const optD = document.getElementById('opt-D');
+        const chkBono = document.getElementById('chkBono');
+        const chkAguinaldo = document.getElementById('chkAguinaldo');
+        const chkVac = document.getElementById('chkVac');
+        const chkIndem = document.getElementById('chkIndem');
+
+        // Cálculo algorítmico de feriados dentro del rango
+        // Creado por Robin Gregorio octubre 14 2026, contacto: +502 4298 9037
+        function calcularFeriadosAuto() {
+            if (estado.diasEvaluar >= 365) return 14; 
+            
+            let count = 0;
+            let d = new Date(estado.fechaInicio);
+            d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
+            
+            for(let i=0; i<estado.diasEvaluar; i++) {
+                let actual = new Date(d);
+                actual.setDate(actual.getDate() + i);
+                let mesDia = String(actual.getMonth()+1).padStart(2,'0') + '-' + String(actual.getDate()).padStart(2,'0');
+                if(FERIADOS_FIJOS.includes(mesDia)) count++;
+            }
+            return count;
+        }
+
+        function getFeriados() {
+            if (estado.feriadosManual !== null) return estado.feriadosManual;
+            return calcularFeriadosAuto();
+        }
+
+        function iniciar() {
+            const saved = localStorage.getItem('simuladorFinalV11');
+            if(saved) estado = { ...estado, ...JSON.parse(saved) };
+
+            inputs.fecha.value = estado.fechaInicio;
+            inputs.dias.value = estado.diasEvaluar;
+            inputs.feriados.value = getFeriados();
+            inputs.cuadrilla.value = estado.cuadrillaSel;
+            inputs.sueldo.value = estado.sueldo.toFixed(2);
+            inputs.personal.value = estado.personalPorTurno;
+            inputs.modelo.value = estado.modeloId;
+            
+            chkBono.checked = estado.cfgBono;
+            chkAguinaldo.checked = estado.cfgAguinaldo;
+            chkVac.checked = estado.cfgVacaciones;
+            chkIndem.checked = estado.cfgIndemnizacion;
+
+            inputs.fecha.addEventListener('change', (e) => { 
+                estado.fechaInicio = e.target.value; 
+                if(estado.feriadosManual === null) inputs.feriados.value = calcularFeriadosAuto();
+                actualizar('fechaInicio', e.target.value); 
+            });
+            inputs.dias.addEventListener('input', (e) => { 
+                let val = Math.max(1, Number(e.target.value) || 28);
+                estado.diasEvaluar = val;
+                if(estado.feriadosManual === null) inputs.feriados.value = calcularFeriadosAuto();
+                actualizar('diasEvaluar', val); 
+            });
+            inputs.feriados.addEventListener('input', (e) => {
+                let val = e.target.value === "" ? null : Math.max(0, Number(e.target.value));
+                actualizar('feriadosManual', val);
+            });
+
+            inputs.cuadrilla.addEventListener('change', (e) => actualizar('cuadrillaSel', e.target.value));
+            inputs.sueldo.addEventListener('input', (e) => actualizar('sueldo', Number(e.target.value) || 0));
+            inputs.personal.addEventListener('input', (e) => actualizar('personalPorTurno', Math.max(1, Number(e.target.value) || 1)));
+            inputs.modelo.addEventListener('change', (e) => actualizar('modeloId', e.target.value));
+            inputs.btnInvertir.addEventListener('click', () => actualizar('tipoRotacion', (estado.tipoRotacion + 1) % 3));
+            
+            chkBono.addEventListener('change', (e) => actualizar('cfgBono', e.target.checked));
+            chkAguinaldo.addEventListener('change', (e) => actualizar('cfgAguinaldo', e.target.checked));
+            chkVac.addEventListener('change', (e) => actualizar('cfgVacaciones', e.target.checked));
+            chkIndem.addEventListener('change', (e) => actualizar('cfgIndemnizacion', e.target.checked));
+
+            document.getElementById('btnFullscreen').addEventListener('click', toggleFullscreen);
+            document.addEventListener('fullscreenchange', actIconoFullscreen);
+
+            renderizar();
+        }
+
+        function actualizar(clave, valor) {
+            estado[clave] = valor;
+            localStorage.setItem('simuladorFinalV11', JSON.stringify(estado));
+            renderizar();
+            if(modal.classList.contains('active')) calcularPlanilla();
+        }
+
+        // Generador de Matriz de Turnos Dinámica
+        // Robin Gregorio octubre 14 2026, contacto: +502 4298 9037
+        function generarMatrizVisual(mod) {
+            let patron;
+            if (estado.tipoRotacion === 1) patron = mod.patronInverso;
+            else if (estado.tipoRotacion === 2) patron = mod.patronNoche;
+            else patron = mod.patronNormal;
+
+            let matriz = { M: [], T: [], N: [], D: [] };
+            const len = patron.length;
+            const labels = ['A', 'B', 'C', 'D'];
+
+            for (let dia = 0; dia < estado.diasEvaluar; dia++) {
+                matriz.M[dia] = []; matriz.T[dia] = []; matriz.N[dia] = []; matriz.D[dia] = [];
+                for(let eq = 0; eq < mod.equipos; eq++) {
+                    let idx = (dia + (eq * mod.desfaseBase)) % len;
+                    let turnoAsignado = patron[idx];
+                    matriz[turnoAsignado][dia].push(labels[eq]);
+                }
+            }
+            return matriz;
+        }
+
+        function renderizar() {
+            const mod = MODELOS[estado.modeloId];
+            
+            if(mod.equipos === 3) {
+                optD.style.display = 'none';
+                if(estado.cuadrillaSel === 'D') { estado.cuadrillaSel = 'ninguna'; inputs.cuadrilla.value = 'ninguna'; }
+            } else {
+                optD.style.display = 'block';
+            }
+
+            let rotTexts = ["M ➔ T ➔ N", "T ➔ M ➔ N", "N ➔ T ➔ M"];
+            if (estado.modeloId == "1") rotTexts = ["M ➔ T ➔ N ➔ D", "T ➔ M ➔ N ➔ D", "N ➔ T ➔ M ➔ D"];
+            inputs.txtRotacion.innerText = rotTexts[estado.tipoRotacion];
+
+            let bgClasses = ["bg-indigo-600 hover:bg-indigo-700", "bg-orange-600 hover:bg-orange-700", "bg-purple-600 hover:bg-purple-700"];
+            inputs.btnInvertir.className = `${bgClasses[estado.tipoRotacion]} text-white rounded-lg px-2 py-2 text-sm font-medium transition shadow-sm flex justify-center items-center gap-1 w-full`;
+
+            const head = document.getElementById('headDias');
+            const body = document.getElementById('bodyTurnos');
+            const matriz = generarMatrizVisual(mod);
+            
+            let htmlHead = `<th class="p-3 sticky-col text-left w-48 z-20">Turno / Horario</th>`;
+            for(let i=0; i<estado.diasEvaluar; i++) {
+                let borderClass = 'border-r border-slate-600';
+                if ((i+1) % 14 === 0) borderClass = 'border-r-4 border-slate-900'; 
+                let bgClass = (i % 28 < 14) ? 'bg-slate-800' : 'bg-slate-700';
+                htmlHead += `<th class="p-2 min-w-[80px] ${borderClass} ${bgClass} z-10 relative">Día ${i+1}<br><span class="text-xs font-normal text-slate-300">${formatearFecha(estado.fechaInicio, i)}</span></th>`;
+            }
+            head.innerHTML = htmlHead;
+
+            let htmlBody = '';
+            TURNOS.forEach(turno => {
+                if(mod.equipos === 3 && turno.id === 'D') return; 
+
+                htmlBody += `<tr class="${turno.clase} border-b border-white/50">`;
+                htmlBody += `<td class="p-3 sticky-col font-bold bg-white/50 backdrop-blur-md z-20 shadow-sm border-r border-slate-200">
+                                ${turno.nombre} <span class="block text-xs font-normal opacity-80">${turno.horas}</span>
+                             </td>`;
+                
+                for(let i=0; i<estado.diasEvaluar; i++) {
+                    let eqsEnTurno = matriz[turno.id][i] || [];
+                    let borderClass = 'border-r border-white/50';
+                    if ((i+1) % 14 === 0) borderClass = 'border-r-4 border-slate-400';
+                    let celdaHtml = '';
+
+                    if (eqsEnTurno.length === 0) {
+                        celdaHtml = `<span class="text-transparent">-</span>`;
+                    } else {
+                        let esMiCuadrilla = (estado.cuadrillaSel !== 'ninguna' && eqsEnTurno.includes(estado.cuadrillaSel));
+                        
+                        if(estado.cuadrillaSel !== 'ninguna') {
+                            if(esMiCuadrilla) {
+                                celdaHtml = `<span class="badge badge-${estado.cuadrillaSel} resaltado px-3 py-1 rounded shadow-sm inline-block w-8 text-center">${estado.cuadrillaSel}</span>`;
+                            } else {
+                                celdaHtml = `<span class="px-3 py-1 rounded shadow-sm inline-block text-center font-bold bg-slate-200 text-slate-400 opacado">${eqsEnTurno.join('/')}</span>`;
+                            }
+                        } else {
+                            celdaHtml = eqsEnTurno.map(eq => `<span class="badge badge-${eq} px-3 py-1 rounded shadow-sm inline-block w-8 text-center mx-[1px]">${eq}</span>`).join('');
+                        }
+                    }
+
+                    htmlBody += `<td class="p-2 ${borderClass} z-10 relative">${celdaHtml}</td>`;
+                }
+                htmlBody += `</tr>`;
+            });
+            body.innerHTML = htmlBody;
+        }
+
+        function formatearFecha(fechaBase, diasSuma) {
+            let f = new Date(fechaBase);
+            f.setMinutes(f.getMinutes() + f.getTimezoneOffset());
+            f.setDate(f.getDate() + diasSuma);
+            const diasStr = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+            return `${diasStr[f.getDay()]} ${f.getDate()}`;
+        }
+
+        const fMoneda = (val) => "Q" + val.toLocaleString('es-GT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
+            else if (document.exitFullscreen) document.exitFullscreen();
+        }
+        function actIconoFullscreen() {
+            const iconExpand = document.getElementById('iconExpand');
+            if (document.fullscreenElement) iconExpand.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>`;
+            else iconExpand.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>`;
+        }
+
+
+        // === LÓGICA DE CARGA MASIVA DE CSV/EXCEL ===
+        // Implementado por Robin Gregorio octubre 14 2026, contacto: +502 4298 9037
+        let globalWorkbook = null;
+        function abrirModalCarga() { document.getElementById('modalCarga').classList.add('active'); }
+        function cerrarModalCarga() {
+            document.getElementById('modalCarga').classList.remove('active');
+            document.getElementById('mappingSection').classList.add('hidden');
+            document.getElementById('fileUpload').value = "";
+        }
+
+        document.getElementById('fileUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const data = evt.target.result;
+                try {
+                    globalWorkbook = XLSX.read(data, {type: 'binary'});
+                    const firstSheet = globalWorkbook.Sheets[globalWorkbook.SheetNames[0]];
+                    const headers = XLSX.utils.sheet_to_json(firstSheet, {header: 1})[0];
+                    
+                    const mapSueldo = document.getElementById('mapSueldo');
+                    mapSueldo.innerHTML = '<option value="">-- Haz clic para seleccionar la columna --</option>';
+                    headers.forEach(h => { if(h) mapSueldo.innerHTML += `<option value="${h}">${h}</option>`; });
+                    
+                    document.getElementById('mappingSection').classList.remove('hidden');
+                } catch(err) { alert("Error leyendo el archivo."); }
+            };
+            reader.readAsBinaryString(file);
+        });
+
+        function aplicarCargaMasiva() {
+            const colSueldo = document.getElementById('mapSueldo').value;
+            if(!colSueldo) return alert("Selecciona la columna de Sueldo Base.");
+
+            const firstSheet = globalWorkbook.Sheets[globalWorkbook.SheetNames[0]];
+            const json = XLSX.utils.sheet_to_json(firstSheet);
+            
+            let totalSueldo = 0, conteo = 0;
+            json.forEach(row => {
+                let strVal = String(row[colSueldo] || "0").replace(/[^0-9.-]+/g,"");
+                let numVal = parseFloat(strVal);
+                if(!isNaN(numVal) && numVal > 0) { totalSueldo += numVal; conteo++; }
+            });
+
+            if(conteo > 0) {
+                let promedioReal = totalSueldo / conteo;
+                alert(`✅ Se detectaron ${conteo} sueldos válidos.\nPromedio: Q${promedioReal.toFixed(2)}.`);
+                actualizar('sueldo', promedioReal);
+                document.getElementById('inSueldo').value = promedioReal.toFixed(2);
+                cerrarModalCarga();
+            } else {
+                alert("❌ No se encontraron números válidos.");
+            }
+        }
+
+
+        // === Tooltips Responsivos ===
+        // Engine de auditoría táctil por Robin Gregorio octubre 14 2026, contacto: +502 4298 9037
+        const tooltipBox = document.getElementById('customTooltip');
+        function bindTooltips() {
+            document.querySelectorAll('.trazable').forEach(el => {
+                if(el.title) { el.setAttribute('data-formula', el.title); el.removeAttribute('title'); }
+                
+                el.addEventListener('mouseenter', (e) => { if (window.matchMedia('(hover: hover)').matches) showTooltip(el, e.clientX, e.clientY); });
+                el.addEventListener('mousemove', (e) => { if (window.matchMedia('(hover: hover)').matches) moveTooltip(e.clientX, e.clientY); });
+                el.addEventListener('mouseleave', (e) => { if (window.matchMedia('(hover: hover)').matches) hideTooltip(); });
+
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    if(tooltipBox.classList.contains('hidden') || tooltipBox.innerHTML !== `<strong>Fórmula / Justificación Legal:</strong><br>${el.getAttribute('data-formula')}`) {
+                        showTooltip(el, e.clientX, e.clientY);
+                    } else { hideTooltip(); }
+                });
+            });
+        }
+        document.addEventListener('click', () => hideTooltip());
+        document.querySelector('.overflow-y-auto').addEventListener('scroll', () => hideTooltip());
+
+        function showTooltip(el, x, y) {
+            tooltipBox.innerHTML = `<strong>Fórmula / Justificación Legal:</strong><br>${el.getAttribute('data-formula')}`;
+            tooltipBox.classList.remove('hidden');
+            moveTooltip(x, y);
+        }
+        function moveTooltip(x, y) {
+            let tWidth = tooltipBox.offsetWidth;
+            let tHeight = tooltipBox.offsetHeight;
+            let posX = x + 15, posY = y + 15;
+            if (posX + tWidth > window.innerWidth) posX = window.innerWidth - tWidth - 10;
+            if (posY + tHeight > window.innerHeight) posY = y - tHeight - 10;
+            if (posX < 0) posX = 10;
+            tooltipBox.style.left = posX + 'px';
+            tooltipBox.style.top = posY + 'px';
+        }
+        function hideTooltip() { tooltipBox.classList.add('hidden'); }
+
+
+        // === CÁLCULO FINANCIERO DINÁMICO ===
+        // Modelo matemático por Robin Gregorio octubre 14 2026, contacto: +502 4298 9037
+        function abrirModalContabilidad() {
+            calcularPlanilla();
+            modal.classList.add('active');
+        }
+        function cerrarModalContabilidad() {
+            modal.classList.remove('active');
+            hideTooltip(); 
+        }
+
+        function calcularPlanilla() {
+            const diasEval = estado.diasEvaluar;
+            document.getElementById('lblModalDias').innerText = diasEval;
+            document.getElementById('lblCajaAhorroDias').innerText = diasEval;
+
+            const sueldo = estado.sueldo;
+            const valOrd = sueldo / 30 / 8;
+            const valExt = valOrd * 1.5;
+            
+            document.getElementById('lblSueldoBase').innerText = fMoneda(sueldo);
+            document.getElementById('lblSueldoBase').title = `Salario mensual ingresado: Q${sueldo.toFixed(2)}.`;
+
+            document.getElementById('lblHoraOrd').innerText = fMoneda(valOrd);
+            document.getElementById('lblHoraOrd').title = `(Sueldo Q${sueldo.toFixed(2)}) ÷ (30 días) ÷ (8 horas de jornada ordinaria).`;
+
+            document.getElementById('lblHoraExt').innerText = fMoneda(valExt);
+            document.getElementById('lblHoraExt').title = `(Hora Ordinaria Q${valOrd.toFixed(2)}) × 1.5. Recargo de Ley del 50% por tiempo extraordinario.`;
+            
+            function calcularPasivos(nominaBase, devengadoTotal) {
+                const baseBono = estado.cfgBono ? devengadoTotal : nominaBase;
+                const baseAguin = estado.cfgAguinaldo ? devengadoTotal : nominaBase;
+                const baseIndem = estado.cfgIndemnizacion ? devengadoTotal : nominaBase;
+                const baseVac = estado.cfgVacaciones ? devengadoTotal : nominaBase;
+                const baseIGSS = devengadoTotal; 
+
+                return {
+                    bono: baseBono * 0.0833, aguin: baseAguin * 0.0833, indem: baseIndem * 0.0833, vac: baseVac * 0.0416, igss: baseIGSS * 0.1267,
+                    baseInfo: { bono: baseBono, aguin: baseAguin, indem: baseIndem, vac: baseVac, igss: baseIGSS }
+                };
+            }
+
+            const totalFeriados = getFeriados();
+
+            // --- 3 CUADRILLAS ---
+            const emp3C = 3 * estado.personalPorTurno;
+            document.querySelectorAll('.emp-3c-qty').forEach(el => el.innerText = emp3C);
+            
+            const nominaBase3C = (sueldo * emp3C) / 30 * diasEval;
+            const extrasMesEmpleado3C = 144; 
+            const costoExtras3C = (extrasMesEmpleado3C / 30) * diasEval * valExt * emp3C;
+            const costoFeriados3C = totalFeriados * 24 * estado.personalPorTurno * valExt; 
+
+            const devengado3C = nominaBase3C + costoExtras3C + costoFeriados3C;
+            const p3 = calcularPasivos(nominaBase3C, devengado3C);
+            const totalPasivo3C = p3.bono + p3.aguin + p3.indem + p3.vac + p3.igss;
+
+            document.getElementById('e3-base').innerText = fMoneda(nominaBase3C);
+            document.getElementById('e3-base').title = `(Sueldo Q${sueldo.toFixed(2)}) × (${emp3C} Emp) ÷ 30 días × ${diasEval} días evaluados.`;
+
+            document.getElementById('e3-extras').innerText = fMoneda(costoExtras3C);
+            document.getElementById('e3-extras').title = `(${emp3C} Emp) × (144h extras/mes promediadas a ${diasEval} días) × (Hora Extra Q${valExt.toFixed(2)}).`;
+
+            document.getElementById('e3-feriados').innerText = fMoneda(costoFeriados3C);
+            document.getElementById('e3-feriados').title = `Art 127: Trabajador 24/7 mensual no pierde horas por asueto, sueldo base ya lo cubre. Si labora, se paga como extra.\nFórmula: ${totalFeriados} Feriados × 24h operativas × ${estado.personalPorTurno} emp/turno × Q${valExt.toFixed(2)}.`;
+
+            document.getElementById('e3-p-bono').innerText = fMoneda(p3.bono);
+            document.getElementById('e3-p-bono').title = `Base Bono (Q${p3.baseInfo.bono.toFixed(2)}) × 8.33%. Extras: ${estado.cfgBono ? 'SI' : 'NO'}.`;
+
+            document.getElementById('e3-p-aguin').innerText = fMoneda(p3.aguin);
+            document.getElementById('e3-p-aguin').title = `Base Aguinaldo (Q${p3.baseInfo.aguin.toFixed(2)}) × 8.33%. Extras: ${estado.cfgAguinaldo ? 'SI' : 'NO'}.`;
+
+            document.getElementById('e3-p-indem').innerText = fMoneda(p3.indem);
+            document.getElementById('e3-p-indem').title = `Base Indemnización (Q${p3.baseInfo.indem.toFixed(2)}) × 8.33%. (Ley GT obliga promediar horas extras de últimos 6 meses). Extras: ${estado.cfgIndemnizacion ? 'SI' : 'NO'}.`;
+
+            document.getElementById('e3-p-vac').innerText = fMoneda(p3.vac);
+            document.getElementById('e3-p-vac').title = `Base Vacaciones (Q${p3.baseInfo.vac.toFixed(2)}) × 4.16%. Extras: ${estado.cfgVacaciones ? 'SI' : 'NO'}.`;
+
+            document.getElementById('e3-p-igss').innerText = fMoneda(p3.igss);
+            document.getElementById('e3-p-igss').title = `Devengado Total (Q${p3.baseInfo.igss.toFixed(2)}) × 12.67% (IGSS, IRTRA, INTECAP).`;
+
+            document.getElementById('e3-pasivo').innerText = fMoneda(totalPasivo3C);
+            document.getElementById('e3-pasivo').title = `Suma de todas las provisiones (Bono, Aguinaldo, Indemnización, Vacaciones, Patronal).`;
+
+            document.getElementById('e3-total').innerText = fMoneda(devengado3C + totalPasivo3C);
+            document.getElementById('e3-total').title = `Nómina Base (Q${nominaBase3C.toFixed(2)}) + Extras (Q${costoExtras3C.toFixed(2)}) + Feriados (Q${costoFeriados3C.toFixed(2)}) + Pasivo (Q${totalPasivo3C.toFixed(2)}).`;
+
+
+            // --- 4 CUADRILLAS ---
+            const emp4C = 4 * estado.personalPorTurno;
+            document.querySelectorAll('.emp-4c-qty').forEach(el => el.innerText = emp4C);
+            
+            const nominaBase4C = (sueldo * emp4C) / 30 * diasEval;
+            
+            const matrizGen = generarMatrizVisual(MODELOS[estado.modeloId]);
+            let turnosNoche4C = 0;
+            for(let d=0; d<diasEval; d++) { turnosNoche4C += matrizGen['N'][d].length; }
+            
+            const extrasTotales4C = turnosNoche4C * 3 * estado.personalPorTurno; 
+            const costoExtras4C = extrasTotales4C * valExt;
+            const costoFeriados4C = totalFeriados * 24 * estado.personalPorTurno * valExt; 
+
+            const devengado4C = nominaBase4C + costoExtras4C + costoFeriados4C;
+            const p4 = calcularPasivos(nominaBase4C, devengado4C);
+            const totalPasivo4C = p4.bono + p4.aguin + p4.indem + p4.vac + p4.igss;
+
+            document.getElementById('e4-base').innerText = fMoneda(nominaBase4C);
+            document.getElementById('e4-base').title = `(Sueldo Q${sueldo.toFixed(2)}) × (${emp4C} Emp) ÷ 30 días × ${diasEval} días evaluados.`;
+
+            document.getElementById('e4-extras').innerText = fMoneda(costoExtras4C);
+            document.getElementById('e4-extras').title = `Mapeo exacto: En ${diasEval} días hay ${turnosNoche4C} turnos nocturnos rotativos. Por ley, cada noche de 9h genera 3h extras.\nFórmula: ${turnosNoche4C} turnos × 3h × ${estado.personalPorTurno} emp/turno × (Hora Extra Q${valExt.toFixed(2)}).`;
+
+            document.getElementById('e4-feriados').innerText = fMoneda(costoFeriados4C);
+            document.getElementById('e4-feriados').title = `Igual que en 3 cuadrillas: 1 feriado = 24 horas continuas operativas que se pagan como sobrecargo a los equipos que estén de turno.\nFórmula: ${totalFeriados} Feriados × 24h × ${estado.personalPorTurno} emp/turno × Q${valExt.toFixed(2)}.`;
+
+            document.getElementById('e4-p-bono').innerText = fMoneda(p4.bono);
+            document.getElementById('e4-p-bono').title = `Base Bono (Q${p4.baseInfo.bono.toFixed(2)}) × 8.33%. Extras: ${estado.cfgBono ? 'SI' : 'NO'}.`;
+
+            document.getElementById('e4-p-aguin').innerText = fMoneda(p4.aguin);
+            document.getElementById('e4-p-aguin').title = `Base Aguinaldo (Q${p4.baseInfo.aguin.toFixed(2)}) × 8.33%. Extras: ${estado.cfgAguinaldo ? 'SI' : 'NO'}.`;
+
+            document.getElementById('e4-p-indem').innerText = fMoneda(p4.indem);
+            document.getElementById('e4-p-indem').title = `Base Indemnización (Q${p4.baseInfo.indem.toFixed(2)}) × 8.33%. Extras: ${estado.cfgIndemnizacion ? 'SI' : 'NO'}.`;
+
+            document.getElementById('e4-p-vac').innerText = fMoneda(p4.vac);
+            document.getElementById('e4-p-vac').title = `Base Vacaciones (Q${p4.baseInfo.vac.toFixed(2)}) × 4.16%. Extras: ${estado.cfgVacaciones ? 'SI' : 'NO'}.`;
+
+            document.getElementById('e4-p-igss').innerText = fMoneda(p4.igss);
+            document.getElementById('e4-p-igss').title = `Devengado Total (Q${p4.baseInfo.igss.toFixed(2)}) × 12.67%.`;
+
+            document.getElementById('e4-pasivo').innerText = fMoneda(totalPasivo4C);
+            document.getElementById('e4-pasivo').title = `Suma de provisiones de las 4 cuadrillas.`;
+
+            document.getElementById('e4-total').innerText = fMoneda(devengado4C + totalPasivo4C);
+            document.getElementById('e4-total').title = `Nómina Base (Q${nominaBase4C.toFixed(2)}) + Extras (Q${costoExtras4C.toFixed(2)}) + Feriados (Q${costoFeriados4C.toFixed(2)}) + Pasivo (Q${totalPasivo4C.toFixed(2)}).`;
+
+            // --- AHORRO ---
+            const total3C = devengado3C + totalPasivo3C;
+            const total4C = devengado4C + totalPasivo4C;
+            const ahorro = total3C - total4C;
+
+            const boxAhorro = document.getElementById('gran-ahorro');
+            if (ahorro > 0) {
+                boxAhorro.innerText = fMoneda(ahorro);
+                boxAhorro.className = "text-4xl font-extrabold text-emerald-400 mb-2 trazable inline-block mx-auto cursor-help";
+                boxAhorro.title = `(Costo 3 Cuadrillas en ${diasEval} días: Q${total3C.toFixed(2)}) - (Costo 4 Cuadrillas: Q${total4C.toFixed(2)}) = Diferencial Positivo Neto de Q${ahorro.toFixed(2)}.`;
+            } else {
+                boxAhorro.innerText = "Incremento: " + fMoneda(Math.abs(ahorro));
+                boxAhorro.className = "text-4xl font-extrabold text-amber-400 mb-2 trazable inline-block mx-auto cursor-help";
+                boxAhorro.title = `(Costo 4 Cuadrillas en ${diasEval} días: Q${total4C.toFixed(2)}) - (Costo 3 Cuadrillas: Q${total3C.toFixed(2)}).`;
+            }
+
+            bindTooltips();
+        }
+
+        iniciar();
+    </script>
+</body>
+</html>
